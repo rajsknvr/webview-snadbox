@@ -3,10 +3,19 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- Header View -->
+    <View
+        android:id="@+id/header"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:background="@android:color/holo_blue_light" />
+
+    <!-- WebView Layout -->
     <WebView
         android:id="@+id/webview"
-        android:configChanges="orientation|screenSize"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_marginTop="80dp"
+        android:configChanges="orientation|screenSize" />
 
 </FrameLayout>

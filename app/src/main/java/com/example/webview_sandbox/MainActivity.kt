@@ -1,12 +1,15 @@
 package com.example.webview_sandbox
 
-import android.content.res.Configuration
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 
@@ -35,57 +38,68 @@ class MainActivity : AppCompatActivity() {
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
         webView.webViewClient = WebViewClient()
+        webView.webChromeClient = MyChrome(this)
+
         originalWebViewLayoutParams = webView.layoutParams
 
-        webView.addJavascriptInterface(WebAppInterface(), "AndroidWebAppInterface")
-        webView.loadUrl("https://frontend-classroom-git-test-video-orientation-lyearn.vercel.app/")
+        webView.loadUrl("https://meet.lyearn.com")
     }
 
-    private fun enterFullscreen() {
-        webView.rotation = 90f
-        val screenWidth = resources.displayMetrics.widthPixels
-        val screenHeight = resources.displayMetrics.heightPixels
-        val params = webView.layoutParams
+    private class MyChrome(private val activity: Activity) : WebChromeClient() {
+        private var mCustomView: View? = null
+        private var mCustomViewCallback: CustomViewCallback? = null
+        private var mOriginalOrientation: Int = 0
+        private var mOriginalSystemUiVisibility: Int = 0
 
-        if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
-            params.height = screenWidth
-            params.width = screenHeight
-        } else {
-            params.height = screenHeight
-            params.width = screenWidth
+        override fun onHideCustomView() {
+            (activity.window.decorView as FrameLayout).removeView(mCustomView)
+            mCustomView = null
+            activity.window.decorView.systemUiVisibility = mOriginalSystemUiVisibility
+            activity.requestedOrientation = mOriginalOrientation
+            mCustomViewCallback?.onCustomViewHidden()
+            mCustomViewCallback = null
         }
 
-        // Calculate margins to center the WebView
-        val marginLeft = (screenWidth - params.width) / 2
-        val marginTop = (screenHeight - params.height) / 2
+        override fun onShowCustomView(
+            paramView: View,
+            paramCustomViewCallback: CustomViewCallback
+        ) {
+            if (mCustomView != null) {
+                onHideCustomView()
+                return
+            }
+            mCustomView = paramView
+            mOriginalSystemUiVisibility = activity.window.decorView.systemUiVisibility
+            mOriginalOrientation = activity.requestedOrientation
+            mCustomViewCallback = paramCustomViewCallback
 
-        // Apply margins
-        (params as? ViewGroup.MarginLayoutParams)?.setMargins(marginLeft, marginTop, 0, 0)
-        webView.layoutParams = params
-    }
+            // Add the custom view to the decor view
+            (activity.window.decorView as FrameLayout).addView(
+                mCustomView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
 
-    private fun exitFullscreen() {
-        webView.rotation = 0f
-        val params = webView.layoutParams
-        params.width = ViewGroup.LayoutParams.MATCH_PARENT
-        params.height = ViewGroup.LayoutParams.MATCH_PARENT
+            // Hide the system UI and make the activity full-screen
+            activity.window.decorView.systemUiVisibility =
+                (View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
 
-        // Reset margins
-        (params as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-        webView.layoutParams = params
-    }
-
-    inner class WebAppInterface {
-        @JavascriptInterface
-        fun enterFullscreen() {
-            runOnUiThread { this@MainActivity.enterFullscreen() }
-        }
-
-        @JavascriptInterface
-        fun exitFullscreen() {
-            runOnUiThread { this@MainActivity.exitFullscreen() }
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         }
     }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        webView.saveState(outState)
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        webView.restoreState(savedInstanceState)
+    }
+
 
     override fun onBackPressed() {
         if (webView.canGoBack()) {
